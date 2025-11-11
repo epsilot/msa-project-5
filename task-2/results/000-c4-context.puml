@@ -1,0 +1,15 @@
+@startuml
+!include <C4/C4_Context>
+!include <C4/C4_Container>
+
+title Формирование прайс-листов
+
+System_Boundary(k8s, "Кластер k8s") {
+    ContainerDb(postgre, "БД прайс-листов", "PostgreSQL")
+    Container(cron, "CronJob формирования выгрузки")
+    ContainerDb(storage, "Хранилище данных")
+
+    Rel(cron, postgre, "Получает данные")
+    Rel(cron, storage, "Загружает готовые прайс-листы")
+}
+@enduml
