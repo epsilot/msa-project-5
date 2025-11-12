@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: export-shipments
+spec:
+  schedule: "* * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: export-shipments
+              image: export-shipments:latest
+              imagePullPolicy: Never
+              env:
+                - name: PG_HOST
+                  value: "postgres"
+                - name: PG_PORT
+                  value: "5432"
+                - name: PG_USER
+                  value: "admin"
+                - name: PG_PASSWORD
+                  value: "adminpassword"
+                - name: PG_DATABASE
+                  value: "logistics"
+                - name: EXPORT_PATH
+                  value: "/data/shipments.csv"
+              volumeMounts:
+                - name: export-data
+                  mountPath: /data
+          restartPolicy: OnFailure
+          volumes:
+            - name: export-data
+              persistentVolumeClaim:
+                claimName: export-pvc

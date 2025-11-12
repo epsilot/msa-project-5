@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+data:
+  shipments-init.sql: |
+    CREATE TABLE IF NOT EXISTS shipments (
+        id SERIAL PRIMARY KEY,
+        shipment_date DATE NOT NULL,
+        client_id INT NOT NULL,
+        origin VARCHAR(255),
+        destination VARCHAR(255),
+        status VARCHAR(50)
+    );
+    INSERT INTO shipments (shipment_date, client_id, origin, destination, status) VALUES
+    ('2025-11-01', 101, 'New York', 'Boston', 'Delivered'),
+    ('2025-11-10', 102, 'Chicago', 'San Francisco', 'In Transit'),
+    ('2025-11-11', 103, 'Houston', 'Dallas', 'Pending');
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_USER
+              value: "admin"
+            - name: POSTGRES_PASSWORD
+              value: "adminpassword"
+            - name: POSTGRES_DB
+              value: "logistics"
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: initdb
+          configMap:
+            name: postgres-init-scripts
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres
