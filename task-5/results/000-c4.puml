@@ -1,0 +1,41 @@
+@startuml
+!include <C4/C4_Context>
+!include <C4/C4_Component>
+
+Person(user, "Сотрудник склада", "Использует web-приложение загрузки отчетов")
+Person(devops, "DevOps", "Дежурный по платформе")
+
+Container(webApp, "Web Приложение", "JS, Angular", "Фронтенд для ERP, загрузка отчётов")
+
+System_Boundary(platform, "GCP") {
+    ContainerDb(refDb, "БД справочных данных о товарах", "PostgreSQL", "Данные характеристик товаров, промо-акций и т.д.")
+    ContainerDb(stockDb, "БД номенклатуры", "PostgreSQL", "Актуальные данные о наличии товаров на складах")
+    Container(blobStore, "Файловое хранилище", "Google Cloud Storage", "Загруженные файлы отчетов")
+    Container(rabbitmq, "RabbitMQ", "AMQP broker", "Передача чанков обработчикам")
+    Container(springBatchMaster, "Spring Batch Master (Java/WildFly)", "Java, Spring Batch", "Сервер с логикой импорта файлов, управление chunk обработкой")
+    Container(springBatchWorker, "Spring Batch Worker (Java)", "Java, Spring Batch", "Обработка, валидация, обновление в БД, масштабируемый воркер")
+    Container(elastic, "Elasticsearch", "Хранение логов")
+    Container(kibana, "Kibana", "Визуализация логово")
+    Container(prometheus, "Prometheus", "Хранение метрик")
+    Container(grafana, "Grafana", "Отображение дашбордов с метриками. Управление алёртами")
+    Container(filebeat, "Filebeat+logstash", "Агрегация логовов")
+}
+
+Rel(user, webApp, "использует")
+Rel(webApp, springBatchMaster, "Импорт файла через")
+Rel(springBatchMaster, blobStore, "Сохраняет/читает файл отчёта")
+Rel(springBatchMaster, rabbitmq, "Посылает чанки для обработки", "AMQP")
+Rel_Up(springBatchWorker, rabbitmq, "Получает чанки для обработки, отправляет результаты", "AMQP")
+Rel(springBatchWorker, refDb, "Получает справочные данные", "SQL")
+Rel(springBatchMaster, stockDb, "Читает результаты обработки", "SQL")
+Rel(springBatchWorker, stockDb, "Сохраняет результаты обработки", "SQL")
+Rel(springBatchMaster, webApp, "Сообщает о результатах обработки", "REST API (JSON)")
+Rel(filebeat, springBatchMaster, "Агрегирует логи")
+Rel(filebeat, springBatchWorker, "Агрегирует логи")
+Rel(filebeat, elastic, "Отправляет логи")
+Rel(kibana, elastic, "Читает информацию о логах")
+Rel(prometheus, springBatchMaster, "Собирает метрики")
+Rel(prometheus, springBatchWorker, "Собирает метрики")
+Rel(grafana, prometheus, "Читает информацию о метриках")
+Rel(grafana, devops, "Отправляет алёрты")
+@enduml
